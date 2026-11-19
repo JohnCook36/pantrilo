@@ -32,3 +32,18 @@ All demo prices are **invented test data**, not actual store or regional prices.
 - No automatic deduction of pantry stock when a plan is merely generated.
 
 See [architecture](docs/ARCHITECTURE.md) and [GitHub issues](https://github.com/JohnCook36/pantrilo/issues).
+
+## Android prototype (work in progress)
+
+The first Expo Android UI lives in `apps/mobile/` (SDK 54). It uses the same TypeScript core from `src/` and has a local demo catalog of 23 recipes and **invented** price fixtures. It is **not** connected to regional statistics or shops.
+
+From the project root, with Node.js 22.13+ and an Android emulator running:
+
+```powershell
+npm install
+npm run check
+npm run mobile:check
+npm run mobile:android
+```
+
+See [docs/MOBILE.md](docs/MOBILE.md) for complete Windows/Android Studio setup and limitations. SQLite, real prices, age-appropriate portions, approved cooking steps and production testing are still pending.

@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Pantrilo",
+    "slug": "pantrilo",
+    "scheme": "pantrilo",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#F6F8F5",
+    "android": {
+      "package": "com.pantrilo.app",
+      "edgeToEdgeEnabled": true
+    },
+    "plugins": [],
+    "experiments": {
+      "autolinkingModuleResolution": true
+    }
+  }
+}

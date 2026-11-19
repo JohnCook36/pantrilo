@@ -4,3 +4,5 @@ coverage/
 .expo/
 .env
 *.log
+apps/mobile/dist-android/
+*.tsbuildinfo

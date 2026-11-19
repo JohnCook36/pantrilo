@@ -1,7 +1,7 @@
-name: Core checks
+name: Pantrilo checks
 on:
   push:
-    branches: [main]
+    branches: [main, 'feat/**']
   pull_request:
 permissions:
   contents: read
@@ -12,6 +12,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22.16.0'
       - run: npm install --no-audit --no-fund
       - run: npm run check
+      - run: npm run mobile:check
+      - name: Android JavaScript bundle smoke check
+        run: npm run mobile:export
