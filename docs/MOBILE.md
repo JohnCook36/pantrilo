@@ -43,3 +43,25 @@ This is an **Expo SDK 54** project. If Expo Go reports an SDK mismatch, install 
 - Select fish as allergen; regenerate and verify no fish ingredients appear.
 - Use a tiny budget: see explicit failure rather than an invented successful plan.
 - Select a region: UI must always clearly show test price warning; it must NOT claim region changes actual prices.
+
+## If Git reports: invalid reference: origin/feat/mobile-demo-20261119
+
+Earlier setup instructions used `git clone --single-branch`. In that case,
+`git fetch origin` will continue to fetch only the initially selected branch,
+so the mobile remote-tracking branch may be absent even though it exists on GitHub.
+From the repository root in PowerShell, without discarding any local changes:
+
+```powershell
+git status --short
+git fetch origin "refs/heads/feat/mobile-demo-20261119:refs/remotes/origin/feat/mobile-demo-20261119"
+git switch --track origin/feat/mobile-demo-20261119
+npm install
+npm run check
+npm run mobile:check
+npm run mobile:android
+```
+
+Before switching, save any local changes if `git status --short` reports them.
+If the explicit fetch fails, run `git remote -v` and verify that `origin`
+points to `https://github.com/JohnCook36/pantrilo.git`.
+The npm mobile scripts exist on the mobile branch, not on the earlier core branch.
