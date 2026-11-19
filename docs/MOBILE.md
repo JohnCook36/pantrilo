@@ -65,3 +65,12 @@ Before switching, save any local changes if `git status --short` reports them.
 If the explicit fetch fails, run `git remote -v` and verify that `origin`
 points to `https://github.com/JohnCook36/pantrilo.git`.
 The npm mobile scripts exist on the mobile branch, not on the earlier core branch.
+
+## Text size accessibility (Android smoke)
+
+- Open **Настройка** and select **Обычный / Крупный / Очень крупный** in the **Размер текста** control.
+- The choice applies to all four screens; the default is **Крупный**, including existing installs that have no saved font preference.
+- From **Меню**, open **Рецепт**. The same control appears on the recipe detail page; changing it immediately affects the ingredient list and descriptions.
+- Close and reopen the app: the selection should persist through AsyncStorage, without resetting the menu or checked shopping items.
+- Test all three sizes in both light and dark themes on Pixel 7, including long product names and the bottom navigation at the largest size.
+- Android accessibility font-size settings may further enlarge React Native text; verify layout with system font scaling as well.
