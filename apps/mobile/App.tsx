@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { loadLocalState, saveLocalState } from './storage.ts';
+import type { SavedState, TextSize } from './state-codec.ts';
 import { calculateBudget, recipeAllowed } from '../../src/index.ts';
 import type { MealAssignment, MealPlan, Recipe } from '../../src/types.ts';
 import {
@@ -13,22 +14,12 @@ import {
 import type { DemoPreferences } from '../../src/sample-catalog.ts';
 
 type Screen = 'setup' | 'menu' | 'shopping' | 'recipes';
-type TextSize = 'normal' | 'large' | 'extra';
 const TEXT_SCALE: Record<TextSize, number> = { normal: 1, large: 1.18, extra: 1.34 };
 const TEXT_SIZE_OPTIONS: ReadonlyArray<{ value: TextSize; label: string }> = [
   { value: 'normal', label: 'Обычный' },
   { value: 'large', label: 'Крупный' },
   { value: 'extra', label: 'Очень крупный' }
 ];
-interface SavedState {
-  preferences: DemoPreferences;
-  plannedPreferences: DemoPreferences | null;
-  plan: MealPlan | null;
-  purchased: string[];
-  darkMode: boolean;
-  textSize: TextSize;
-}
-const STORAGE_KEY = 'pantrilo:demo:v1';
 const fmtMoney = (kopecks: number) => `${(kopecks / 100).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽`;
 const nameByIngredient = new Map(INGREDIENTS.map((i) => [i.id, i]));
 const nameByRecipe = new Map(RECIPES.map((r) => [r.id, r]));
@@ -65,6 +56,8 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [textSize, setTextSize] = useState<TextSize>('large');
   const [loaded, setLoaded] = useState(false);
+  const [storageReady, setStorageReady] = useState(false);
+  const [storageError, setStorageError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const colors = darkMode ? COLORS.dark : COLORS.light;
@@ -72,30 +65,33 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
-    AsyncStorage.getItem(STORAGE_KEY).then((value) => {
-      if (!active || !value) return;
-      const saved = JSON.parse(value) as Partial<SavedState>;
-      if (saved.preferences && typeof saved.preferences.budgetRub === 'number') {
-        setPreferences(saved.preferences); setBudgetInput(String(saved.preferences.budgetRub));
-      }
-      if (saved.plan && Array.isArray(saved.plan.assignments)) setPlan(saved.plan);
-      if (saved.plannedPreferences) setPlannedPreferences(saved.plannedPreferences);
-      if (Array.isArray(saved.purchased)) setPurchased(saved.purchased);
-      if (typeof saved.darkMode === 'boolean') setDarkMode(saved.darkMode);
-      if (saved.textSize === 'normal' || saved.textSize === 'large' || saved.textSize === 'extra') {
+    loadLocalState().then((saved) => {
+      if (!active) return;
+      if (saved) {
+        setPreferences(saved.preferences);
+        setBudgetInput(String(saved.preferences.budgetRub));
+        setPlan(saved.plan);
+        setPlannedPreferences(saved.plannedPreferences);
+        setPurchased(saved.purchased);
+        setDarkMode(saved.darkMode);
         setTextSize(saved.textSize);
       }
+      setStorageReady(true);
     }).catch(() => {
-      if (active) setError('Не удалось прочитать локальные данные. Можно продолжить с новыми настройками.');
+      if (active) {
+        setStorageError('Не удалось открыть сохранённые данные. Они не удалены, но новые изменения пока не сохраняются.');
+      }
     }).finally(() => { if (active) setLoaded(true); });
     return () => { active = false; };
   }, []);
   useEffect(() => {
-    if (!loaded) return;
+    if (!loaded || !storageReady) return;
     const data: SavedState = { preferences, plannedPreferences, plan, purchased, darkMode, textSize };
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data)).catch(() =>
-      setError('Не удалось сохранить изменения на устройстве.'));
-  }, [loaded, preferences, plannedPreferences, plan, purchased, darkMode, textSize]);
+    void saveLocalState(data).then(
+      () => setStorageError(null),
+      () => setStorageError('Не удалось сохранить данные SQLite. Изменения на экране могут не сохраниться.')
+    );
+  }, [loaded, storageReady, preferences, plannedPreferences, plan, purchased, darkMode, textSize]);
 
   const update = <K extends keyof DemoPreferences>(key: K, value: DemoPreferences[K]) => {
     setPreferences((prev) => ({ ...prev, [key]: value })); setError(null);
@@ -299,6 +295,7 @@ export default function App() {
     <View style={s.header}><View><Text style={s.brand}>pantrilo<Text style={s.brandDot}>.</Text></Text>
       <Text style={s.brandSub}>Семейное питание без лишних трат</Text></View>
       <Pressable onPress={() => setDarkMode(!darkMode)} accessibilityRole="button" accessibilityLabel="Сменить тему" style={s.themeButton}><Text style={s.themeText}>{darkMode?'☀️':'🌙'}</Text></Pressable></View>
+    {storageError ? <View style={s.errorBox}><Text style={s.errorText}>{storageError}</Text></View> : null}
     {error && screen!=='setup' ? <View style={s.errorBox}><Text style={s.errorText}>{error}</Text></View> : null}
     <ScrollView key={screen} style={s.scroller} keyboardShouldPersistTaps="handled" contentContainerStyle={s.scrollContent}>
       {screen==='setup' ? renderSetup() : screen==='menu' ? renderMenu() : screen==='shopping' ? renderShopping() : renderRecipes()}

@@ -74,3 +74,9 @@ The npm mobile scripts exist on the mobile branch, not on the earlier core branc
 - Close and reopen the app: the selection should persist through AsyncStorage, without resetting the menu or checked shopping items.
 - Test all three sizes in both light and dark themes on Pixel 7, including long product names and the bottom navigation at the largest size.
 - Android accessibility font-size settings may further enlarge React Native text; verify layout with system font scaling as well.
+
+## SQLite persistence v1 (dependent PR)
+
+New mobile development branch `feat/sqlite-persistence-20261119` migrates existing
+AsyncStorage demo state to Expo SQLite on first launch, retaining the legacy
+key as an untouched emergency backup. See [SQLite migration details](SQLITE.md).
