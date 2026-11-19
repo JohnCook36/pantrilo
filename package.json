@@ -3,12 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22.10" },
+  "engines": {
+    "node": ">=22.10"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test test/*.test.ts",
     "demo": "node --experimental-strip-types src/demo.ts",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "mobile": "npm run start -w @pantrilo/mobile",
+    "mobile:android": "npm run android -w @pantrilo/mobile",
+    "mobile:check": "npm run typecheck -w @pantrilo/mobile",
+    "mobile:export": "npm run export:android -w @pantrilo/mobile"
   },
-  "devDependencies": { "typescript": "^5.8.3" }
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "workspaces": [
+    "apps/mobile"
+  ]
 }
