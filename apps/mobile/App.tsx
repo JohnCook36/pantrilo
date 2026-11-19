@@ -13,12 +13,20 @@ import {
 import type { DemoPreferences } from '../../src/sample-catalog.ts';
 
 type Screen = 'setup' | 'menu' | 'shopping' | 'recipes';
+type TextSize = 'normal' | 'large' | 'extra';
+const TEXT_SCALE: Record<TextSize, number> = { normal: 1, large: 1.18, extra: 1.34 };
+const TEXT_SIZE_OPTIONS: ReadonlyArray<{ value: TextSize; label: string }> = [
+  { value: 'normal', label: 'Обычный' },
+  { value: 'large', label: 'Крупный' },
+  { value: 'extra', label: 'Очень крупный' }
+];
 interface SavedState {
   preferences: DemoPreferences;
   plannedPreferences: DemoPreferences | null;
   plan: MealPlan | null;
   purchased: string[];
   darkMode: boolean;
+  textSize: TextSize;
 }
 const STORAGE_KEY = 'pantrilo:demo:v1';
 const fmtMoney = (kopecks: number) => `${(kopecks / 100).toLocaleString('ru-RU', { maximumFractionDigits: 2 })} ₽`;
@@ -55,11 +63,12 @@ export default function App() {
   const [purchased, setPurchased] = useState<string[]>([]);
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(false);
+  const [textSize, setTextSize] = useState<TextSize>('large');
   const [loaded, setLoaded] = useState(false);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const colors = darkMode ? COLORS.dark : COLORS.light;
-  const s = useMemo(() => makeStyles(colors), [darkMode]);
+  const s = useMemo(() => makeStyles(colors, TEXT_SCALE[textSize]), [darkMode, textSize]);
 
   useEffect(() => {
     let active = true;
@@ -73,6 +82,9 @@ export default function App() {
       if (saved.plannedPreferences) setPlannedPreferences(saved.plannedPreferences);
       if (Array.isArray(saved.purchased)) setPurchased(saved.purchased);
       if (typeof saved.darkMode === 'boolean') setDarkMode(saved.darkMode);
+      if (saved.textSize === 'normal' || saved.textSize === 'large' || saved.textSize === 'extra') {
+        setTextSize(saved.textSize);
+      }
     }).catch(() => {
       if (active) setError('Не удалось прочитать локальные данные. Можно продолжить с новыми настройками.');
     }).finally(() => { if (active) setLoaded(true); });
@@ -80,10 +92,10 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (!loaded) return;
-    const data: SavedState = { preferences, plannedPreferences, plan, purchased, darkMode };
+    const data: SavedState = { preferences, plannedPreferences, plan, purchased, darkMode, textSize };
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data)).catch(() =>
       setError('Не удалось сохранить изменения на устройстве.'));
-  }, [loaded, preferences, plannedPreferences, plan, purchased, darkMode]);
+  }, [loaded, preferences, plannedPreferences, plan, purchased, darkMode, textSize]);
 
   const update = <K extends keyof DemoPreferences>(key: K, value: DemoPreferences[K]) => {
     setPreferences((prev) => ({ ...prev, [key]: value })); setError(null);
@@ -154,6 +166,17 @@ export default function App() {
       <Text style={s.stepperValue}>{value}</Text>
       <Pressable accessibilityRole="button" accessibilityLabel={`Увеличить: ${title}`} style={s.stepperButton} onPress={() => onValue(Math.min(max, value + 1))}><Text style={s.stepperText}>+</Text></Pressable>
     </View></View>;
+  const fontSizePicker = () => <View style={s.fontSizePicker} accessibilityRole="radiogroup">
+    {TEXT_SIZE_OPTIONS.map((option) => <Pressable key={option.value}
+      accessibilityRole="radio" accessibilityState={{ checked: textSize === option.value }}
+      accessibilityLabel={`Размер текста: ${option.label}`}
+      onPress={() => setTextSize(option.value)}
+      style={[s.fontSizeOption, textSize === option.value ? s.fontSizeOptionActive : null]}>
+      <Text style={[s.fontSizeOptionText, textSize === option.value ? s.fontSizeOptionTextActive : null]}>
+        {option.label}
+      </Text>
+    </Pressable>)}
+  </View>;
   const banner = <View style={s.warningCard}><Text style={s.warningText}>ⓘ {DEMO_PRICE_NOTICE}</Text></View>;
 
   const renderSetup = () => <View style={s.content}>
@@ -161,6 +184,8 @@ export default function App() {
       <Text style={s.heroTitle}>Вкусная неделя без лишних трат</Text>
       <Text style={s.heroDesc}>Укажи бюджет и предпочтения – Pantrilo рассчитает меню и общую продуктовую корзину.</Text></View>
     {banner}
+    <View style={s.card}>{section('Размер текста', 'Выбери удобный размер для всех экранов.')}
+      {fontSizePicker()}</View>
     {section('Регион', 'Выбор сохраняется для подключения реальных региональных прайс-листов.')}
     <View style={s.chips}>{REGIONS.map((region) => chip(region, preferences.region === region, () => update('region', region)))}</View>
     <View style={s.card}>{section('Бюджет на неделю, ₽')}
@@ -254,11 +279,13 @@ export default function App() {
     </View><Text style={s.arrow}>›</Text></Pressable>;
   const renderRecipes = () => <View style={s.content}>
     {selectedRecipe ? <View style={s.card}>
-      <Pressable onPress={() => setSelectedRecipeId(null)}><Text style={s.link}>← Все рецепты</Text></Pressable>
+      <Pressable onPress={() => setSelectedRecipeId(null)} style={s.recipeBack}><Text style={s.link}>← Все рецепты</Text></Pressable>
+      <Text style={s.recipeFontLabel}>Размер текста</Text>
+      {fontSizePicker()}
       <Text style={s.recipeBigEmoji}>🥘</Text><Text style={s.heroTitleDark}>{selectedRecipe.name}</Text>
       <Text style={s.muted}>Ингредиенты на одну стандартную порцию</Text><View style={s.line}/>
       {selectedRecipe.ingredients.map((part) => <View key={part.ingredientId} style={s.summaryRow}>
-        <Text style={s.itemLabel}>{nameByIngredient.get(part.ingredientId)?.name || part.ingredientId}</Text>
+        <Text style={[s.itemLabel, s.ingredientName]}>{nameByIngredient.get(part.ingredientId)?.name || part.ingredientId}</Text>
         <Text style={s.money}>{qty(part.ingredientId,part.amount)}</Text></View>)}
       <View style={s.line}/><Text style={s.caption}>Необходимая техника: {selectedRecipe.equipment.length ? selectedRecipe.equipment.map(e => e==='stove'?'плита':'духовка').join(', ') : 'без специальной техники'}</Text>
       <Text style={s.footerNote}>Проверенные пошаговые инструкции, выход готового блюда и пищевая ценность ещё не добавлены. Пока не используйте этот каталог как кулинарное руководство.</Text>
@@ -283,42 +310,50 @@ export default function App() {
 }
 
 type Palette = typeof COLORS.light;
-function makeStyles(c: Palette) {
+function makeStyles(c: Palette, scale: number) {
+  const fs = (value: number) => Math.round(value * scale);
   return StyleSheet.create({
     root:{flex:1,backgroundColor:c.bg},loading:{justifyContent:'center'},
     header:{paddingHorizontal:20,paddingVertical:12,flexDirection:'row',justifyContent:'space-between',alignItems:'center',borderBottomColor:c.line,borderBottomWidth:1},
-    brand:{fontSize:26,fontWeight:'900',letterSpacing:-1,color:c.text},brandDot:{color:c.accent},brandSub:{fontSize:10,color:c.muted},
-    themeButton:{backgroundColor:c.card,width:42,height:42,alignItems:'center',justifyContent:'center',borderRadius:15},themeText:{fontSize:20},
+    brand:{fontSize:fs(26),fontWeight:'900',letterSpacing:-1,color:c.text},brandDot:{color:c.accent},brandSub:{fontSize:fs(11),color:c.muted},
+    themeButton:{backgroundColor:c.card,width:42,height:42,alignItems:'center',justifyContent:'center',borderRadius:15},themeText:{fontSize:fs(20)},
     scroller:{flex:1},scrollContent:{paddingBottom:26},content:{padding:16,gap:16},
-    hero:{backgroundColor:c.accent,borderRadius:24,padding:22,gap:10},heroEyebrow:{color:'#E3F4E9',letterSpacing:1.4,fontSize:10,fontWeight:'800'},
-    heroTitle:{color:'#FFFFFF',fontSize:27,fontWeight:'900',lineHeight:34},heroTitleDark:{color:c.text,fontSize:24,fontWeight:'800'},
-    heroDesc:{color:'#EDF9F2',fontSize:13,lineHeight:20},
-    warningCard:{backgroundColor:c.warningBg,borderRadius:14,padding:13},warningText:{color:c.warning,fontSize:12,lineHeight:19},
-    sectionIntro:{gap:4},sectionTitle:{fontSize:18,fontWeight:'800',color:c.text},muted:{color:c.muted,fontSize:12,lineHeight:19},
+    hero:{backgroundColor:c.accent,borderRadius:24,padding:22,gap:10},heroEyebrow:{color:'#E3F4E9',letterSpacing:1.4,fontSize:fs(10),fontWeight:'800'},
+    heroTitle:{color:'#FFFFFF',fontSize:fs(27),fontWeight:'900',lineHeight:fs(34)},heroTitleDark:{color:c.text,fontSize:fs(24),fontWeight:'800'},
+    heroDesc:{color:'#EDF9F2',fontSize:fs(14),lineHeight:fs(21)},
+    warningCard:{backgroundColor:c.warningBg,borderRadius:14,padding:13},warningText:{color:c.warning,fontSize:fs(13),lineHeight:fs(21)},
+    sectionIntro:{gap:4},sectionTitle:{fontSize:fs(18),fontWeight:'800',color:c.text},muted:{color:c.muted,fontSize:fs(13),lineHeight:fs(21)},
     chips:{flexDirection:'row',flexWrap:'wrap',gap:8},chip:{paddingHorizontal:13,paddingVertical:10,borderRadius:22,borderWidth:1,borderColor:c.line,backgroundColor:c.card},
-    chipActive:{backgroundColor:c.accentSoft,borderColor:c.accent},chipText:{color:c.text,fontSize:12,fontWeight:'600'},chipTextActive:{color:c.accent},
+    chipActive:{backgroundColor:c.accentSoft,borderColor:c.accent},chipText:{color:c.text,fontSize:fs(12),fontWeight:'600'},chipTextActive:{color:c.accent},
     card:{backgroundColor:c.card,borderRadius:20,padding:17,gap:14,borderWidth:1,borderColor:c.line},
-    budgetInput:{backgroundColor:c.input,borderColor:c.line,borderWidth:1,borderRadius:13,paddingHorizontal:14,paddingVertical:13,fontSize:24,fontWeight:'800',color:c.text},
+    budgetInput:{backgroundColor:c.input,borderColor:c.line,borderWidth:1,borderRadius:13,paddingHorizontal:14,paddingVertical:13,fontSize:fs(24),fontWeight:'800',color:c.text},
     stepperRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},stepperControls:{flexDirection:'row',alignItems:'center',gap:13},
     stepperButton:{width:36,height:36,backgroundColor:c.input,borderColor:c.line,borderWidth:1,borderRadius:11,alignItems:'center',justifyContent:'center'},
-    stepperText:{fontSize:23,color:c.accent},stepperValue:{minWidth:20,textAlign:'center',fontSize:17,fontWeight:'800',color:c.text},
-    itemLabel:{fontSize:13,fontWeight:'700',color:c.text},switchRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},
-    checkText:{fontSize:23,color:c.accent},line:{height:1,backgroundColor:c.line},
+    stepperText:{fontSize:fs(23),color:c.accent},stepperValue:{minWidth:20,textAlign:'center',fontSize:fs(17),fontWeight:'800',color:c.text},
+    itemLabel:{fontSize:fs(14),fontWeight:'700',color:c.text},switchRow:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},
+    checkText:{fontSize:fs(23),color:c.accent},line:{height:1,backgroundColor:c.line},
     primaryButton:{backgroundColor:c.accent,borderRadius:15,padding:17,alignItems:'center',justifyContent:'center',marginTop:4,minHeight:54},
-    primaryButtonText:{color:'#FFFFFF',fontSize:15,fontWeight:'800'},disabled:{opacity:.6},
-    errorBox:{backgroundColor:c.warningBg,padding:14,borderRadius:12,marginHorizontal:10},errorText:{color:c.warning,fontSize:13,lineHeight:20},
-    footerNote:{fontSize:11,lineHeight:18,color:c.muted},empty:{padding:30,gap:14,alignItems:'center',justifyContent:'center',minHeight:280},emptyEmoji:{fontSize:55},
+    primaryButtonText:{color:'#FFFFFF',fontSize:fs(15),fontWeight:'800'},disabled:{opacity:.6},
+    errorBox:{backgroundColor:c.warningBg,padding:14,borderRadius:12,marginHorizontal:10},errorText:{color:c.warning,fontSize:fs(13),lineHeight:fs(20)},
+    footerNote:{fontSize:fs(12),lineHeight:fs(20),color:c.muted},empty:{padding:30,gap:14,alignItems:'center',justifyContent:'center',minHeight:280},emptyEmoji:{fontSize:fs(55)},
     progressOuter:{height:8,borderRadius:8,overflow:'hidden',backgroundColor:'#FFFFFF55'},progressInner:{height:8,backgroundColor:'#DAEFDE',borderRadius:8},
-    dayTitle:{fontSize:16,fontWeight:'800',color:c.text,marginBottom:3},mealRow:{flexDirection:'row',gap:12,paddingVertical:9,borderTopColor:c.line,borderTopWidth:1},
-    mealEmoji:{fontSize:24,width:34},mealCopy:{flex:1,gap:3},caption:{fontSize:11,color:c.muted,lineHeight:16},mealActions:{flexDirection:'row',gap:22,marginTop:6},
-    link:{fontSize:12,fontWeight:'800',color:c.accent},
-    summaryRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:8},money:{fontSize:12,color:c.text,fontWeight:'700'},total:{fontSize:18,color:c.accent,fontWeight:'900'},
+    dayTitle:{fontSize:fs(16),fontWeight:'800',color:c.text,marginBottom:3},mealRow:{flexDirection:'row',gap:12,paddingVertical:9,borderTopColor:c.line,borderTopWidth:1},
+    mealEmoji:{fontSize:fs(24),width:34},mealCopy:{flex:1,gap:3},caption:{fontSize:fs(12),color:c.muted,lineHeight:fs(19)},mealActions:{flexDirection:'row',gap:22,marginTop:6},
+    link:{fontSize:fs(13),fontWeight:'800',color:c.accent},
+    summaryRow:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:8},money:{fontSize:fs(13),color:c.text,fontWeight:'700'},total:{fontSize:fs(18),color:c.accent,fontWeight:'900'},
     shoppingRow:{backgroundColor:c.card,borderColor:c.line,borderWidth:1,borderRadius:15,padding:13,flexDirection:'row',gap:10,alignItems:'center'},
     shoppingText:{flex:1,gap:4},strike:{textDecorationLine:'line-through',color:c.muted},
     recipeRow:{backgroundColor:c.card,borderColor:c.line,borderWidth:1,borderRadius:15,padding:14,flexDirection:'row',gap:11,alignItems:'center'},
-    recipeIcon:{fontSize:24},arrow:{fontSize:24,color:c.muted},recipeBigEmoji:{fontSize:55,textAlign:'center',marginTop:14},
+    recipeIcon:{fontSize:fs(24)},arrow:{fontSize:fs(24),color:c.muted},recipeBigEmoji:{fontSize:fs(55),textAlign:'center',marginTop:14},
+    ingredientName:{flex:1,flexShrink:1,marginRight:8},recipeBack:{minHeight:40,justifyContent:'center'},
+    recipeFontLabel:{fontSize:fs(13),fontWeight:'700',color:c.text},
+    fontSizePicker:{flexDirection:'row',flexWrap:'wrap',gap:8},
+    fontSizeOption:{minHeight:44,flexGrow:1,flexBasis:'27%',paddingHorizontal:8,paddingVertical:10,borderRadius:12,borderWidth:1,borderColor:c.line,backgroundColor:c.input,alignItems:'center',justifyContent:'center'},
+    fontSizeOptionActive:{borderColor:c.accent,backgroundColor:c.accentSoft},
+    fontSizeOptionText:{fontSize:fs(12),color:c.text,fontWeight:'700',textAlign:'center'},
+    fontSizeOptionTextActive:{color:c.accent},
     tabs:{flexDirection:'row',backgroundColor:c.card,borderTopColor:c.line,borderTopWidth:1,paddingVertical:9,paddingHorizontal:4},
-    tab:{flex:1,alignItems:'center',justifyContent:'center',gap:4,minHeight:48},tabEmoji:{fontSize:19},tabText:{fontSize:10,color:c.muted,fontWeight:'600'},
+    tab:{flex:1,alignItems:'center',justifyContent:'center',gap:4,minHeight:48},tabEmoji:{fontSize:fs(19)},tabText:{fontSize:fs(11),color:c.muted,fontWeight:'600',textAlign:'center'},
     tabTextActive:{color:c.accent,fontWeight:'900'},tabIndicator:{position:'absolute',top:-9,left:'33%',right:'33%',height:3,borderBottomLeftRadius:3,borderBottomRightRadius:3,backgroundColor:c.accent}
   });
 }
